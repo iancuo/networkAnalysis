@@ -15,7 +15,8 @@ getDoParWorkers()
 options(cores=4)
 getDoParWorkers()
 
-setwd("/home/dan/workDir/networkAnalysis")
+#setwd("/home/dan/workDir/networkAnalysis")
+##
 
 source("/home/dan/workDir/functionDefinitions.R")
 try(dir.create("resultsCoexpr"), silent = F)

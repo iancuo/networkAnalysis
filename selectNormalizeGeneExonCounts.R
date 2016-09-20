@@ -12,7 +12,7 @@ library(sgof)
 
 
 getDoParWorkers()
-options(cores=14)
+options(cores=4)
 getDoParWorkers()
 
 setwd("/home/dan/workDir/networkAnalysis")

@@ -12,25 +12,33 @@ library(sgof)
 
 
 getDoParWorkers()
-options(cores=2)
+options(cores=14)
 getDoParWorkers()
 
-source("/home/dan/workDir/functionDefinitions.R")
+# linux does not work with box so this code has a local data directory
+
+setwd("/home/dan/workDir/networkAnalysis")
+
+source("/home/dan/workDir/networkAnalysis/functionDefinitions.R")
 try(dir.create("resultsCoexpr"), silent = F)
 try( dir.create("figuresCoexpr"), silent = F)
 try(dir.create("resultsCoSplicEx"), silent = F)
 try( dir.create("figuresCoSplicEx"), silent = F)
 
 # read raw data - can be improved by using read.table from original .txt file
-geneReadsRaw=as.matrix(read.csv("data/RNA160225TP_gene_reads_not_normalized.csv", header=T, row.names=1))
+geneReadsRaw=read.table("RNASeq019 HSCC Alex/CEA/RNASeq019_CEA_mm10_gene_reads_not_normalized.txt")
 geneNames=rownames(geneReadsRaw)
-# read sample info - sample names need to be inspected and categories extracted differently for each dataset !!!!!!!!!
-sample_info=colnames(geneReadsRaw)
-splitIDs=mapply(strsplit, sample_info, MoreArgs=list(split="_", fixed = FALSE, perl = FALSE, useBytes = FALSE))
-sampleInfo=unlist(lapply(splitIDs, "[[", 3))
 
-samplesHigh=grep("H",sampleInfo )
-samplesLow=grep("L",sampleInfo )
+# read sample info - sample names need to be inspected and categories extracted differently for each dataset !!!!!!!!!
+sampleKey=read.csv("RNASeq019 HSCC Alex/CEA/CEAsampleKey.csv", header=T)
+sampleKey[,"CeA"]=paste("S", sampleKey[,"CeA"], sep = "")
+
+# other projects might mean strsplit
+# splitIDs=mapply(strsplit, sample_info, MoreArgs=list(split="_", fixed = FALSE, perl = FALSE, useBytes = FALSE))
+# sampleInfo=unlist(lapply(splitIDs, "[[", 3))
+
+samplesHigh=sampleKey[grep("H",sampleKey[,"Line"] ), "CeA"]
+samplesLow=sampleKey[grep("L",sampleKey[,"Line"] ), "CeA"]
 
 ##################################################################################################################
 # divide the data in different groups and perform DE with edgeR

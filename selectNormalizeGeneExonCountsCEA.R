@@ -67,19 +67,26 @@ adjustedResults<-SGoF(u=pValues)
 summary(adjustedResults)
 
 sortedAdjustedPvals=adjustedResults$Adjusted.pvalues
-names(sortedAdjustedPvals)=names(sortedPvals)
+names(sortedAdjustedPvals)=sortedGeneNames
 
-resultsDEtotal=cbind(de.tgw$table, de.calls)
+# some sanity checks
+#plot(pValues[sortedGeneNames], adjustedResults$data) # should be straight line
+#plot(pValues[sortedGeneNames], adjustedResults$data) # should be straight line
 
-# select genes with logCPM > 0 (equivalent to CPM>1) for further analysis
-resultsDEtotal=resultsDEtotal[resultsDEtotal[,"logCPM"]>0,]
+meanCounts=rowMeans(geneReadsRaw)
+sdCounts=apply(geneReadsRaw,1, sd) 
+cvCounts=sdCounts/meanCounts
+
+resultsDEtotal=cbind(de.tgw$table[sortedGeneNames,], meanCounts[sortedGeneNames], cvCounts[sortedGeneNames] )
+colnames(resultsDEtotal)=c(colnames(de.tgw$table), c("mean counts", "CV counts"))
+
+#this will be collected in Supplemental Table 1
 write.csv(resultsDEtotal, file="resultsCoexpr/resultsDEtotal.csv")
-# resultsDEtotal=read.csv("resultsCoexpr/resultsDEtotal.csv")
-# rownames(resultsDEtotal)=resultsDEtotal[,1]
+
 
 ###################################################################################
 
-# calculate edgeR normalization factors and normalize the data - use all data not just selected
+# calculate edgeR normalization factors and normalize the data
 UQnormFactors=calcNormFactors(geneReadsRaw, method=c("upperquartile"))
 
 effectiveLibrarySizes= UQnormFactors*colSums(geneReadsRaw)
@@ -92,32 +99,57 @@ for (sample in 1:dim(normalizedGeneCountsUQ)[2]){
 	normalizedGeneCountsUQ[,sample]= geneReadsRaw[, sample]* countNormFactor[sample]	
 }
 
-geneReads=normalizedGeneCountsUQ[rownames(resultsDEtotal), ]
-##################################################
-# # find genes with connectivity in top 50%
 
-CPMgenes=rownames(geneReads)[resultsDEtotal[,"logCPM"] > 0]
+# select genes with logCPM > 0 (equivalent to CPM>1) and with high CV (top 75%) for further analysis
 
-connCounts=softConnectivity(t(geneReads), power=6)
+geneNamesHighCPM=geneNames[resultsDEtotal[,"logCPM"]>0]
+geneCountsHighCPM=normalizedGeneCountsUQ[geneNamesHighCPM,]
+cvCountsHighCPM=cvCounts[geneNamesHighCPM]
 
-quantileConn=quantile(connCounts, seq(0, 1, 0.1))  
-geneReadsHighConn=geneReads[connCounts>quantileConn[6],]
-geneNamesHighConn=rownames(geneReadsHighConn)
+quantileCV=quantile(cvCountsHighCPM, na.rm=T)  
+geneNamesHighCV=geneNamesHighCPM[cvCountsHighCPM>quantileCV[2]]
+geneReadsHighCV=geneCountsHighCPM[cvCountsHighCPM>quantileCV[2],]
+
+
+#############################################################################################################
+connCoexpr=rowSums(geneReadsHighCV)
+hist(connCoexpr,100)
+quantile(connCoexpr, na.rm=T)
+
+
+plot(cvCountsHighCPM[geneNamesHighCV], connCoexpr, ylim=c(0,500000), xlab="CV gene counts", ylab="Coexpr connectivity", cex.lab=1.25, font.lab=2)
+
+cor(cvCountsHighCPM[geneNamesHighCV], connCoexpr, use = "pairwise.complete.obs")
+
+quantileConnGenes=quantile(connCoSplicEx, probs = seq(0, 1, 0.25))  
+quantileCVdist=quantile(cvDist, probs = seq(0, 1, 0.25), na.rm=T)  
+
+plot(cvDist, connCoSplicEx, xlim=c(0,1), xlab="CV Canberra distances", ylab="CoSplicEx connectivity", cex.lab=1.25, font.lab=2)
+hist(cvDist, 100)
+hist(connCoSplicEx, 50)
+sum(connCoSplicEx > 2)
+sum(connCoSplicEx > 1.5)
+
+
+geneNamesHighCoSplicExConn=names(canberraListExons)[connCoSplicEx>quantileConnExons[6]]
+################################################################################################3
+
+
+
 ###################################################################################
-exonCounts=read.csv("data/RNA160225TP_exon_reads_not_normalized.csv", header=T, row.names=1)
+exonCounts=read.table("RNASeq019 HSCC Alex/CEA/RNASeq019_CEA_mm10_exon_reads_not_normalized.txt")
+
 
 splitIDs=mapply(strsplit, rownames(exonCounts), MoreArgs=list(split="_", fixed = FALSE, perl = FALSE, useBytes = FALSE))
 exonGeneName=unlist(lapply(splitIDs, "[[", 4))
 exon_start=unlist(lapply(splitIDs, "[[", 2))
 
+#sanity check
+
+colnames(exonCounts)==colnames(geneReadsHighCV)
+
 sum(exonCounts[exonGeneName=="Drd2",])
-sum(geneReadsHighConn[geneNamesHighConn=="Drd2",])
-
-exon_unique_id=mapply(paste, exonGeneName, exon_start, MoreArgs=list(sep="_"))
-names(exonGeneName)=exon_unique_id
-
-rownames(exonCounts)= exon_unique_id
-sampleNames=as.vector(colnames(exonCounts))
+sum(geneReadsHighCV["Drd2",])
 
 normExonCounts=0* exonCounts
 for (sample in 1:dim(exonCounts)[2]){
@@ -126,13 +158,12 @@ for (sample in 1:dim(exonCounts)[2]){
 normExonCounts =round(normExonCounts)
 rownames(normExonCounts)=rownames(exonCounts)
 
-
 # select exons from genes with at least 1 CPM
-exonCountsHighCounts=normExonCounts[which(exonGeneName %in% rownames(resultsDEtotal)),]
-exonGeneNamesHighCounts=exonGeneName[exonGeneName %in% rownames(resultsDEtotal)]
-  
-canberraListExons=foreach (geneName = rownames(resultsDEtotal), .inorder=T, .verbose = T) %dopar% {
-  #geneName=geneNames[i]
+exonCountsHighCounts=normExonCounts[which(exonGeneName %in% geneNamesHighCPM),]
+exonGeneNamesHighCounts=exonGeneName[exonGeneName %in% geneNamesHighCPM]
+
+# compute Canberra distances 
+canberraListExons=foreach (geneName = geneNamesHighCPM, .inorder=T, .verbose = T) %dopar% {
   currExonCounts= exonCountsHighCounts[which(exonGeneNamesHighCounts==geneName),]	
   if (is.null(dim(currExonCounts))){
     exonDistMatrix=as.matrix(dist(as.matrix(currExonCounts), method="canberra"))
@@ -144,15 +175,10 @@ canberraListExons=foreach (geneName = rownames(resultsDEtotal), .inorder=T, .ver
   exonDistMatrix
   
 }
-names(canberraListExons)=rownames(resultsDEtotal)
-
+names(canberraListExons)=geneNamesHighCPM
+save(canberraListExons, file="resultsCoexpr/canberraListExonsCEA.RData")
+# load("data/canberraListExons.RData")
 ########################################################################################################
-
-
-########################################################################################################
-
-save(canberraListExons, file="data/canberraListExons.RData")
-load("data/canberraListExons.RData")
 
 nGenes=length(canberraListExons)
 gene_indexes=1:nGenes
@@ -166,20 +192,36 @@ for(gene in names(canberraListExons)) {
   distData[,gene]=as.vector(as.dist(canberraListExons[[gene]]))
 } 
 
+##########################################################################################################
+# compute CV of pairwise distances
+
+meanDist=rowMeans(t(distData))
+sdDist=apply(distData,2, sd) 
+cvDist=sdDist/meanDist
+#############################################################################################################
 adjCoSplicEx_large=adjacency(distData,power=6)
-
-
-save(adjCoSplicEx_large, file="data/adjCoSplicEx_large.RData")
+save(adjCoSplicEx_large, file="resultsCoexpr/adjCoSplicEx_large.RData")
 
 #load("data/adjCoSplicEx_large.RData")
 #just in case ...
 adjCoSplicEx_large[is.na(adjCoSplicEx_large)]=0
 diag(adjCoSplicEx_large)=1
 colnames(adjCoSplicEx_large)=rownames(adjCoSplicEx_large)
-
-
 connCoSplicEx=rowSums(adjCoSplicEx_large)
-quantileConnExons=quantile(connCoSplicEx, probs = seq(0, 1, 0.1))  
+
+
+#############################################################################################################
+
+
+quantileConnExons=quantile(connCoSplicEx, probs = seq(0, 1, 0.25))  
+quantileCVdist=quantile(cvDist, probs = seq(0, 1, 0.25), na.rm=T)  
+
+plot(cvDist, connCoSplicEx, xlim=c(0,1), xlab="CV Canberra distances", ylab="CoSplicEx connectivity", cex.lab=1.25, font.lab=2)
+hist(cvDist, 100)
+hist(connCoSplicEx, 50)
+sum(connCoSplicEx > 2)
+sum(connCoSplicEx > 1.5)
+
 
 geneNamesHighCoSplicExConn=names(canberraListExons)[connCoSplicEx>quantileConnExons[6]]
 ################################################################################################3

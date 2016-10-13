@@ -20,26 +20,26 @@ getDoParWorkers()
 setwd("/home/dan/workDir/networkAnalysis")
 
 source("/home/dan/workDir/networkAnalysis/functionDefinitions.R")
-try(dir.create("resultsCoexpr_CEA"), silent = F)
-try( dir.create("figuresCoexpr_CEA"), silent = F)
-try(dir.create("resultsCoSplicEx_CEA"), silent = F)
-try( dir.create("figuresCoSplicEx_CEA"), silent = F)
+try(dir.create("resultsCoexpr_SH"), silent = F)
+try( dir.create("figuresCoexpr_SH"), silent = F)
+try(dir.create("resultsCoSplicEx_SH"), silent = F)
+try( dir.create("figuresCoSplicEx_SH"), silent = F)
 
 # read raw data - can be improved by using read.table from original .txt file
-geneReadsRaw=as.matrix(read.table("RNASeq019 HSCC Alex/CEA/RNASeq019_CEA_mm10_gene_reads_not_normalized.txt"))
+geneReadsRaw=as.matrix(read.table("RNASeq019 HSCC Alex/SH/RNASeq019_SH_mm10_gene_reads_not_normalized.txt"))
 
 geneNames=rownames(geneReadsRaw)
 
 # read sample info - sample names need to be inspected and categories extracted differently for each dataset !!!!!!!!!
-sampleKey=read.csv("RNASeq019 HSCC Alex/CEA/CEAsampleKey.csv", header=T)
-sampleKey[,"CeA"]=paste("S", sampleKey[,"CeA"], sep = "")
+sampleKey=read.csv("RNASeq019 HSCC Alex/SH/SHsampleKey.csv", header=T)
+sampleKey[,"Shell"]=paste("S", sampleKey[,"Shell"], sep = "")
 
 # other projects might mean strsplit
 # splitIDs=mapply(strsplit, sample_info, MoreArgs=list(split="_", fixed = FALSE, perl = FALSE, useBytes = FALSE))
 # sampleInfo=unlist(lapply(splitIDs, "[[", 3))
 
-samplesHigh=sampleKey[grep("H",sampleKey[,"Line"] ), "CeA"]
-samplesLow=sampleKey[grep("L",sampleKey[,"Line"] ), "CeA"]
+samplesHigh=sampleKey[grep("H",sampleKey[,"Line"] ), "Shell"]
+samplesLow=sampleKey[grep("L",sampleKey[,"Line"] ), "Shell"]
 
 ##################################################################################################################
 # divide the data in different groups and perform DE with edgeR
@@ -70,7 +70,7 @@ summary(adjustedResults)
 sortedAdjustedPvals_DE=adjustedResults$Adjusted.pvalues
 names(sortedAdjustedPvals_DE)=sortedGeneNames
 
-fileConnSummary<-file("resultsCoexpr_CEA/SummaryResultsCoexpr.txt",  open="wt")
+fileConnSummary<-file("resultsCoexpr_SH/SummaryResultsCoexpr.txt",  open="wt")
 
 writeLines(paste("Number of genes with >1 CPM that are DE at FDR=0.05: ", sum(sortedAdjustedPvals_DE<0.05), sep=' '), fileConnSummary)
 close(fileConnSummary)
@@ -146,7 +146,7 @@ summary(adjustedResults)
 sortedAdjustedPvals_DV=adjustedResults$Adjusted.pvalues
 names(sortedAdjustedPvals_DV)=sortedGeneNames
 
-fileConnSummary<-file("resultsCoexpr_CEA/SummaryResultsCoexpr.txt",  open="at")
+fileConnSummary<-file("resultsCoexpr_SH/SummaryResultsCoexpr.txt",  open="at")
 
 writeLines(paste("Number of genes with >1 CPM that are DV at FDR=0.05: ", sum(sortedAdjustedPvals_DV<0.05), sep=' '), fileConnSummary)
 close(fileConnSummary)
@@ -154,8 +154,8 @@ close(fileConnSummary)
 geneNamesDE=sortedGeneNames[sortedAdjustedPvals_DE < 0.05]
 geneNamesDV=sortedGeneNames[sortedAdjustedPvals_DV < 0.05]
 
-write.csv(geneNamesDE, file="resultsCoexpr_CEA/geneNamesDE.csv")
-write.csv(geneNamesDV, file="resultsCoexpr_CEA/geneNamesDV.csv")
+write.csv(geneNamesDE, file="resultsCoexpr_SH/geneNamesDE.csv")
+write.csv(geneNamesDV, file="resultsCoexpr_SH/geneNamesDV.csv")
 
 setdiff(geneNamesHighCPM, geneNames)
 
@@ -165,7 +165,7 @@ results_highCPMgenes=round(results_highCPMgenes,3)
 colnames(results_highCPMgenes)=c(colnames(de.tgw$table), c("mean counts L", "mean counts H", " p val DE", " adj p DE", "sd L", "sd H", "p val DV", "adj p val DV"))
 rownames(results_highCPMgenes)=geneNamesHighCPM
 #this will be collected in Supplemental Table 1
-write.csv(results_highCPMgenes, file="resultsCoexpr_CEA/resultsDEDV_highCPM.csv")
+write.csv(results_highCPMgenes, file="resultsCoexpr_SH/resultsDEDV_highCPM.csv")
 
 #######################################################################################3
 # possibly swithch to bicor correlation in the future
@@ -213,7 +213,7 @@ adjCoexprHighConn=adjCoexpr[highConnGenes,highConnGenes]
 
 selectedGeneCounts=normalizedGeneCountsUQ[highConnGenes,]
 ###################################################################################
-exonCounts=read.table("RNASeq019 HSCC Alex/CEA/RNASeq019_CEA_mm10_exon_reads_not_normalized.txt")
+exonCounts=read.table("RNASeq019 HSCC Alex/SH/RNASeq019_SH_mm10_exon_reads_not_normalized.txt")
 
 
 splitIDs=mapply(strsplit, rownames(exonCounts), MoreArgs=list(split="_", fixed = FALSE, perl = FALSE, useBytes = FALSE))
@@ -253,8 +253,8 @@ canberraListExons=foreach (geneName = geneNamesHighCPM, .inorder=T, .verbose = T
   
 }
 names(canberraListExons)=geneNamesHighCPM
-save(canberraListExons, file="resultsCoSplicEx_CEA/canberraListExonsCEA.RData")
- load("resultsCoSplicEx_CEA/canberraListExonsCEA.RData")
+save(canberraListExons, file="resultsCoSplicEx_SH/canberraListExonsSH.RData")
+ load("resultsCoSplicEx_SH/canberraListExonsSH.RData")
 ########################################################################################################
 
 nGenes=length(canberraListExons)
@@ -320,7 +320,7 @@ selectedExonCounts=normExonCounts[which(exonGeneName %in% exonGeneNameSelected),
 
 ########################################################################################################
 
-save(selectedGeneCounts, canberraListSelected,adjCoSplicEx,selectedExonCounts, exonGeneNameSelected, groupSelection, samplesHigh, samplesLow, file="selectedData_CEA.RData")
+save(selectedGeneCounts, canberraListSelected,adjCoSplicEx,selectedExonCounts, exonGeneNameSelected, groupSelection, samplesHigh, samplesLow, file="selectedData_SH.RData")
 #load("data/selectedData.RData")
 
 
